@@ -1,45 +1,46 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Sidebar, { SidebarItem } from "../../components/sidebar";
 import "../../App.css";
-import {
-  Outlet,
-  useLocation,
-  useParams,
-  useSearchParams,
-} from "react-router-dom";
-import { AuthGuard } from "../../config/Guard";
-import { useAxios } from "../../config/hooks";
+import { Outlet, useLocation } from "react-router-dom";
+import { House, QrCode, Users, SignOut } from "@phosphor-icons/react";
 
 function Dashboard() {
   const location = useLocation().pathname;
-  const beaxios = useAxios();
-
-  function handleSubmit(e){
-    beaxios.post()
-  }
 
   return (
-      <div className="flex">
-        <Sidebar>
-          <SidebarItem
-            text="Dashboard"
-            name="dashboard"
-            active={location == "/admin"}
-            to="/admin"
-          />{" "}
-          {/* Contoh icon */}
-          <SidebarItem
-            text="Siswa"
-            name="siswa"
-            active={location.includes("/siswa")}
-            to="siswa"
-          />
-          <SidebarItem text="Logout" to="/admin/login" />
-        </Sidebar>
-        <div className="content h-screen overflow-y-auto bg-white w-full p-4">
-          <Outlet />
-        </div>
+    <div className="flex">
+      <Sidebar>
+        <SidebarItem
+          icon={<House size={22} />}
+          text="Dashboard"
+          name="dashboard"
+          active={location === "/admin"}
+          to="/admin"
+        />
+        <SidebarItem
+          icon={<QrCode size={22} />}
+          text="Scan QR / Verifikasi"
+          name="scan"
+          active={location.includes("/admin/scan")}
+          to="scan"
+        />
+        <SidebarItem
+          icon={<Users size={22} />}
+          text="Data Siswa"
+          name="siswa"
+          active={location.includes("/admin/siswa")}
+          to="siswa"
+        />
+        <SidebarItem
+          icon={<SignOut size={22} />}
+          text="Logout"
+          to="/admin/login"
+        />
+      </Sidebar>
+      <div className="content h-screen overflow-y-auto bg-gray-50 w-full p-6">
+        <Outlet />
       </div>
+    </div>
   );
 }
 

@@ -7,6 +7,7 @@ import Login from "./pages/admin/login";
 import Siswa from "./pages/admin/Siswa";
 import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
 import Home from "./pages/admin/home";
+import ScanQr from "./pages/admin/ScanQr";
 import { AuthProvider } from "./config/Provider";
 import { AuthGuard } from "./config/Guard";
 function App() {
@@ -24,7 +25,7 @@ function App() {
             }
           >
             <Route index element={<Home />} />
-
+            <Route path="scan" element={<ScanQr />} />
             <Route path="siswa" element={<Siswa />} />
           </Route>
           <Route path="/admin/login" element={<Login />} />

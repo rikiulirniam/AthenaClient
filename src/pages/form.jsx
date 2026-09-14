@@ -9,19 +9,27 @@ import {
   CalendarDots,
   DeviceMobile,
   UserCircle,
+  Envelope,
+  CheckCircle,
 } from "@phosphor-icons/react";
 
 import axios from "axios";
 import { useAxios } from "../config/hooks";
-import { data } from "autoprefixer";
+import { Alert } from "../components/Alert";
 
 function Form() {
   const [asalSekolah, setAsalSekolah] = useState([]);
   const [selectedSekolah, setSelectedSekolah] = useState("");
   const [search, setSerach] = useState("");
-  const [jurusans, setJurusans] = useState();
-  const [dataSiswa, setDataSiswa] = useState();
+  const [jurusans, setJurusans] = useState([]);
+  const [dataSiswa, setDataSiswa] = useState({
+    jenis_kelamin: "1",
+    agama: "Islam",
+  });
   const [isOpen, setIsOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState(null);
+  const [isSuccess, setIsSuccess] = useState(false);
   const searchRef = useRef(null);
   const dropdownRef = useRef(null);
 
@@ -30,32 +38,90 @@ function Form() {
   }
   
   const handleSelect = (item) => {
-    console.log(item);
     setSelectedSekolah(item);
     setIsOpen(false);
   }
 
   const handleSearch = (e) => {
-    console.log(e.target.value);
     setSerach(e.target.value);
   }
 
   const [step, setStep] = useState(1);
 
-  function handleSubmit(e) {
-    console.log(e);
-  }
-
   const nextStep = (e) => {
     e.preventDefault();
+    setAlert(null);
     setStep((prevStep) => prevStep + 1);
   };
 
   const prevStep = () => {
+    setAlert(null);
     setStep((prevStep) => prevStep - 1);
   };
 
   const beaxios = useAxios();
+
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
+    setAlert(null);
+
+    const payload = {
+      name: dataSiswa?.name || "",
+      nisn: dataSiswa?.nisn || "",
+      nik: dataSiswa?.nik || "",
+      email: dataSiswa?.email || "",
+      tempat_lahir: dataSiswa?.tempat_lahir || "",
+      tanggal_lahir: dataSiswa?.tanggal_lahir || "",
+      jenis_kelamin: dataSiswa?.jenis_kelamin === "0" || dataSiswa?.jenis_kelamin === 0 ? 0 : 1,
+      agama: dataSiswa?.agama || "Islam",
+      alamat_lengkap: dataSiswa?.alamat_lengkap || "",
+      no_telepon: dataSiswa?.no_telepon || "",
+      no_telepon_ortu: dataSiswa?.no_telepon_ortu || "",
+      nama_ayah: dataSiswa?.nama_ayah || "",
+      nama_ibu: dataSiswa?.nama_ibu || "",
+      pekerjaan_ayah: dataSiswa?.pekerjaan_ayah || "",
+      pekerjaan_ibu: dataSiswa?.pekerjaan_ibu || "",
+      asal_sekolah: selectedSekolah || dataSiswa?.asal_sekolah || "",
+      jurusan_id: dataSiswa?.jurusan_id || (jurusans && jurusans[0]?.id) || "",
+    };
+
+    if (!payload.name) {
+      setAlert("Harap isi nama lengkap calon siswa.");
+      return;
+    }
+    if (!payload.email) {
+      setAlert("Harap isi email aktif (untuk pengiriman QR Code).");
+      return;
+    }
+    if (!payload.asal_sekolah) {
+      setAlert("Harap pilih asal sekolah (SMP/MTs).");
+      return;
+    }
+    if (!payload.jurusan_id) {
+      setAlert("Harap pilih paket keahlian / jurusan.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await beaxios.post("/siswa", payload);
+      setIsSuccess(true);
+    } catch (err) {
+      console.error(err);
+      if (err.response?.data?.errors) {
+        const errorMessages = Object.values(err.response.data.errors).flat().join(" | ");
+        setAlert(errorMessages);
+      } else if (err.response?.data?.message) {
+        setAlert(err.response.data.message);
+      } else if (err.response?.data?.error) {
+        setAlert(err.response.data.error);
+      } else {
+        setAlert("Gagal mengirim data pendaftaran. Periksa koneksi backend Anda.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -66,44 +132,35 @@ function Form() {
 
     document.addEventListener("mousedown", handleClickOutside);
 
-
     const fetchData = async () => {
-      let url = "https://api-sekolah-indonesia.vercel.app/sekolah/smp?kab_kota=031800&page=1&perPage=30"
+      let url = "https://api-sekolah-indonesia.vercel.app/sekolah/smp?kab_kota=031800&page=1&perPage=30";
   
       if(search){
         url = `https://api-sekolah-indonesia.vercel.app/sekolah/s?sekolah=${search}`;
-      }else if(search == ""){
-        url = "https://api-sekolah-indonesia.vercel.app/sekolah/smp?kab_kota=031800&page=1&perPage=30"
+      } else if(search === "") {
+        url = "https://api-sekolah-indonesia.vercel.app/sekolah/smp?kab_kota=031800&page=1&perPage=30";
       }
       
-      try{
-        const res = await axios.get(url)
+      try {
+        const res = await axios.get(url);
         setAsalSekolah(res.data.dataSekolah);
 
         beaxios.get("/jurusans").then((res) => {
-            setJurusans(res.data.data);
-          });
+          const jur = res.data.data;
+          setJurusans(jur);
+          if (jur && jur.length > 0) {
+            setDataSiswa((prev) => ({
+              ...prev,
+              jurusan_id: prev?.jurusan_id || jur[0].id,
+            }));
+          }
+        });
       } catch (err) {
-
+        console.error(err);
       }
     };
     
     fetchData();    
-    // axios
-    //   .get(
-    //     url
-    //   )
-    //   .then((res) => {
-    //     console.log(res.data.dataSekolah.sekolah);
-    //     setAsalSekolah(res.data.dataSekolah);
-    //   })
-    //   .catch((err) => {
-    //     console.log(err);
-    //   });
-
-    // beaxios.get("/jurusans").then((res) => {
-    //   setJurusans(res.data.data);
-    // });
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -125,199 +182,258 @@ function Form() {
       </div>
       <div className="gap-5 flex flex-col w-full items-center justify-center">
         <div className="w-11/12 max-w-4xl">
-          <form
-            className="shadow-md relative top-[-80px]  bg-white rounded p-6 mb-4"
-            onSubmit={nextStep}
-          >
-            {step === 1 && (
-              <div className="step1 flex flex-col justify-between h-full">
-                <div>
-                  {/* Nama */}
-                  <div className="mb-4">
-                    <label
-                      className="block text-gray-700 text-sm font-semibold mb-2"
-                      htmlFor="name"
-                    >
-                      Nama
-                    </label>
-                    <div className="input-group flex items-center justify-center">
-                      <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
-                        <GraduationCap size={24} color="grey" />
-                      </span>
-                      <input
-                        className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                        id="name"
-                        name="name"
-                        type="text"
-                        placeholder="Nama"
-                        value={dataSiswa?.name}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                  {/* NISN */}
-                  <div className="mb-4">
-                    <label
-                      className="block text-gray-700 text-sm font-semibold mb-2"
-                      htmlFor="NISN"
-                    >
-                      NISN
-                    </label>
-                    <div className="input-group flex items-center justify-center">
-                      <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
-                        <IdentificationCard size={24} color="grey" />
-                      </span>
-                      <input
-                        inputMode="numeric"
-                        className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                        id="NISN"
-                        type="text"
-                        name="nisn"
-                        placeholder="NISN"
-                        value={dataSiswa?.nisn}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                  {/* nik */}
-                  <div className="mb-4">
-                    <label
-                      className="block text-gray-700 text-sm font-semibold mb-2"
-                      htmlFor="NIK"
-                    >
-                      NIK
-                    </label>
-                    <div className="input-group flex items-center justify-center">
-                      <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
-                        <IdentificationCard size={24} color="grey" />
-                      </span>
-                      <input
-                        inputMode="numeric"
-                        className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                        id="NIK"
-                        type="text"
-                        placeholder="NIK"
-                        name="nik"
-                        value={dataSiswa?.nik}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-end pt-5">
-                  <button
-                    className="bg-[#5e72e4] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                    type="submit"
-                  >
-                    Next
-                  </button>
-                </div>
+          {isSuccess ? (
+            <div className="shadow-md relative top-[-80px] bg-white rounded p-8 mb-4 text-center">
+              <div className="flex justify-center mb-4 text-green-500">
+                <CheckCircle size={64} weight="fill" />
               </div>
-            )}
-            {step === 2 && (
-              <div className="step2 flex flex-col justify-between h-full">
-                <div>
-                  {/* tempat lahir */}
-                  <div className="mb-4">
-                    <label
-                      className="block text-gray-700 text-sm font-semibold mb-2"
-                      htmlFor="tempatLahir"
-                    >
-                      Tempat Lahir
-                    </label>
-                    <div className="input-group flex items-center justify-center">
-                      <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
-                        <MapPin size={24} color="grey" />
-                      </span>
-                      <input
-                        className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                        id="tempatLahir"
-                        type="text"
-                        placeholder="Tempat Lahir"
-                        name="tempat_lahir"
-                        value={dataSiswa?.tempat_lahir}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                  {/* tanggal lahir */}
-                  <div className="mb-4">
-                    <label
-                      className="block text-gray-700 text-sm font-semibold mb-2"
-                      htmlFor="tanggalLahir"
-                    >
-                      Tanggal Lahir
-                    </label>
-                    <div className="input-group flex items-center justify-center">
-                      <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
-                        <CalendarDots size={26} color="grey" />
-                      </span>
-                      <input
-                        className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-                        id="tanggalLahir"
-                        type="date"
-                        placeholder="Tanggal Lahir"
-                        name="tanggal_lahir"
-                        value={dataSiswa?.tanggal_lahir}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                  {/* jenis kelamin */}
-                  <div className="mb-4">
-                    <label
-                      className="block text-gray-700 text-sm font-semibold mb-2"
-                      htmlFor="jenisKelamin"
-                    >
-                      Jenis Kelamin
-                    </label>
-                    <div className="input-group flex items-center justify-center">
-                      <select
-                        value={dataSiswa?.jenis_kelamin}
-                        onChange={handleChange}
-                        name="jenis_kelamin"
-                        className="w-full border-1 shadow p-2"
-                        id="jenisKelamin"
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Pendaftaran Berhasil!</h2>
+              <p className="text-gray-600 mb-4">
+                Terima kasih telah mendaftar di SMK Tunas Harapan Pati.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded p-4 mb-6 text-sm text-blue-800 text-left">
+                <p className="font-semibold mb-1">Informasi Penting:</p>
+                <p>
+                  Bukti pendaftaran dan kode QR telah dikirimkan ke email{" "}
+                  <span className="font-bold">{dataSiswa?.email}</span>. Silakan periksa kotak masuk (atau folder spam/junk).
+                </p>
+                <p className="mt-1">
+                  Tunjukkan kode QR tersebut kepada petugas saat melakukan daftar ulang di sekolah.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsSuccess(false);
+                  setStep(1);
+                  setDataSiswa({ jenis_kelamin: "1", agama: "Islam" });
+                  setSelectedSekolah("");
+                }}
+                className="bg-[#5e72e4] hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:shadow-outline"
+                type="button"
+              >
+                Daftar Calon Siswa Baru Lainnya
+              </button>
+            </div>
+          ) : (
+            <form
+              className="shadow-md relative top-[-80px]  bg-white rounded p-6 mb-4"
+              onSubmit={nextStep}
+            >
+              {alert && (
+                <div className="mb-4">
+                  <Alert color="red" message={alert} />
+                </div>
+              )}
+              {step === 1 && (
+                <div className="step1 flex flex-col justify-between h-full">
+                  <div>
+                    {/* Nama */}
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-semibold mb-2"
+                        htmlFor="name"
                       >
-                        <option
-                          name=""
-                          id="1"
-                          value="laki-laki"
-                          className="text-sm"
-                        >
-                          Laki-laki
-                        </option>
-                        <option
-                          name=""
-                          id="0"
-                          value="perempuan"
-                          className="text-sm"
-                        >
-                          Perempuan
-                        </option>
-                      </select>
+                        Nama
+                      </label>
+                      <div className="input-group flex items-center justify-center">
+                        <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
+                          <GraduationCap size={24} color="grey" />
+                        </span>
+                        <input
+                          className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                          id="name"
+                          name="name"
+                          type="text"
+                          placeholder="Nama Lengkap"
+                          value={dataSiswa?.name || ""}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    {/* Email */}
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-semibold mb-2"
+                        htmlFor="email"
+                      >
+                        Email Aktif (untuk menerima QR Code pendaftaran)
+                      </label>
+                      <div className="input-group flex items-center justify-center">
+                        <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
+                          <Envelope size={24} color="grey" />
+                        </span>
+                        <input
+                          className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                          id="email"
+                          type="email"
+                          name="email"
+                          placeholder="contoh: siswa@gmail.com"
+                          value={dataSiswa?.email || ""}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    {/* NISN */}
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-semibold mb-2"
+                        htmlFor="NISN"
+                      >
+                        NISN (10 digit)
+                      </label>
+                      <div className="input-group flex items-center justify-center">
+                        <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
+                          <IdentificationCard size={24} color="grey" />
+                        </span>
+                        <input
+                          inputMode="numeric"
+                          maxLength={10}
+                          className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                          id="NISN"
+                          type="text"
+                          name="nisn"
+                          placeholder="NISN (10 digit)"
+                          value={dataSiswa?.nisn || ""}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    {/* nik */}
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-semibold mb-2"
+                        htmlFor="NIK"
+                      >
+                        NIK (16 digit)
+                      </label>
+                      <div className="input-group flex items-center justify-center">
+                        <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
+                          <IdentificationCard size={24} color="grey" />
+                        </span>
+                        <input
+                          inputMode="numeric"
+                          maxLength={16}
+                          className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                          id="NIK"
+                          type="text"
+                          placeholder="NIK (16 digit)"
+                          name="nik"
+                          value={dataSiswa?.nik || ""}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
                     </div>
                   </div>
+                  <div className="flex items-center justify-end pt-5">
+                    <button
+                      className="bg-[#5e72e4] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                      type="submit"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
+              )}
+              {step === 2 && (
+                <div className="step2 flex flex-col justify-between h-full">
+                  <div>
+                    {/* tempat lahir */}
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-semibold mb-2"
+                        htmlFor="tempatLahir"
+                      >
+                        Tempat Lahir
+                      </label>
+                      <div className="input-group flex items-center justify-center">
+                        <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
+                          <MapPin size={24} color="grey" />
+                        </span>
+                        <input
+                          className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                          id="tempatLahir"
+                          type="text"
+                          placeholder="Tempat Lahir"
+                          name="tempat_lahir"
+                          value={dataSiswa?.tempat_lahir || ""}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    {/* tanggal lahir */}
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-semibold mb-2"
+                        htmlFor="tanggalLahir"
+                      >
+                        Tanggal Lahir
+                      </label>
+                      <div className="input-group flex items-center justify-center">
+                        <span className="p-1.5 rounded-tl-md border-t-2 border-l-2 border-b-2 rounded-bl-md bg-white shadow-bottom-only">
+                          <CalendarDots size={26} color="grey" />
+                        </span>
+                        <input
+                          className="w-full border-t-2 border-r-2 border-b-2 py-2 bg-white shadow-bottom-only rounded-tr-md rounded-br-md text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                          id="tanggalLahir"
+                          type="date"
+                          placeholder="Tanggal Lahir"
+                          name="tanggal_lahir"
+                          value={dataSiswa?.tanggal_lahir || ""}
+                          onChange={handleChange}
+                          required
+                        />
+                      </div>
+                    </div>
+                    {/* jenis kelamin */}
+                    <div className="mb-4">
+                      <label
+                        className="block text-gray-700 text-sm font-semibold mb-2"
+                        htmlFor="jenisKelamin"
+                      >
+                        Jenis Kelamin
+                      </label>
+                      <div className="input-group flex items-center justify-center">
+                        <select
+                          value={dataSiswa?.jenis_kelamin ?? "1"}
+                          onChange={handleChange}
+                          name="jenis_kelamin"
+                          className="w-full border-1 shadow p-2 rounded"
+                          id="jenisKelamin"
+                        >
+                          <option value="1" className="text-sm">
+                            Laki-laki
+                          </option>
+                          <option value="0" className="text-sm">
+                            Perempuan
+                          </option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={prevStep}
-                    className="bg-white hover:bg-[#F1F1F1] text-[#5e72e4] font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                    type="button"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={nextStep}
-                    className="bg-[#5e72e4] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                    type="button"
-                  >
-                    Next
-                  </button>
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={prevStep}
+                      className="bg-white hover:bg-[#F1F1F1] text-[#5e72e4] font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                      type="button"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={nextStep}
+                      className="bg-[#5e72e4] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                      type="button"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
             {step === 3 && (
               <div className="step3">
                 {/* agama */}
@@ -627,6 +743,7 @@ function Form() {
                 <div className="flex items-center justify-between">
                   <button
                     onClick={prevStep}
+                    disabled={loading}
                     className="bg-white hover:bg-[#F1F1F1] text-[#5e72e4] font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
                     type="button"
                   >
@@ -634,15 +751,19 @@ function Form() {
                   </button>
                   <button
                     onClick={handleSubmit}
-                    className="bg-[#5e72e4] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                    disabled={loading}
+                    className={`bg-[#5e72e4] hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline ${
+                      loading ? "opacity-60 cursor-not-allowed" : ""
+                    }`}
                     type="button"
                   >
-                    Daftar
+                    {loading ? "Sedang Mendaftar..." : "Daftar"}
                   </button>
                 </div>
               </div>
             )}
           </form>
+        )}
           <footer className="py-5">
             <div className="container">
               <div className="row align-items-center justify-content-xl-between">
